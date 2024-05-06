@@ -1,0 +1,22 @@
+name: brutils
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.7
+  - gcc_linux-64
+  - pip
+  - python-snappy
+  - snappy
+  - sqlalchemy
+  - pyodbc
+  - pyomo
+  - glpk
+  - ipopt
+  - coincbc
+  - libhdfs3
+  - pymc3
+  - numba
+
+  - pip:
+    - "--editable=."
+    - "-r requirements.txt"
