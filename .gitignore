@@ -49,3 +49,5 @@ brutils/.ipynb_checkpoints/
 dependencies/
 jupyter/
 html/
+.RData/
+.Rhistory/
