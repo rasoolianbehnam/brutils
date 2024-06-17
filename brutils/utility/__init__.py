@@ -702,5 +702,26 @@ def html(text, font_size='16px', font_family='Arial', color='black', background_
     display(HTML(html))
 
 
+def pyarray_to_series(a, name=None):
+    if a.type == 'string':
+        dtype = 'string[pyarrow]'
+    elif a.type == 'large_string':
+        dtype = 'large_string[pyarrow]'
+    else:
+        try:
+            dtype = a.type.to_pandas_dtype()
+            dtype = re.findall('\'numpy\.(.*?)_*\'', str(dtype))[0]
+            dtype = dtype + '[pyarrow]'
+            # .replace("numpy.", "")+'[pyarrow]'
+        except:
+            dtype = 'object'
+    return pd.Series(a, dtype=dtype, name=name)
+
+
+
+def pyarrow_to_pandas(df):
+    return pd.concat([pyarray_to_series(df[c], c) for c in df.column_names], axis=1)
+
+
 pd_to_sparse_matrix = df_to_csr_matrix
 openDf = read_dataframe
