@@ -26,6 +26,33 @@ class remote_ray_jupyter:
             return (
                 subprocess.getoutput(f"cat {out}")[nout:],
                 subprocess.getoutput(f"cat {err}")[nerr:],
-                *ret
+                *ret,
             )
-        return ray.remote(num_returns=2+self.n_returns)(g)
+
+        return ray.remote(num_returns=2 + self.n_returns)(g)
+
+
+class Scheduler:
+    def __init__(self, n):
+        self.n = n
+        self.running = []
+
+    @wraps(ray.remote)
+    def __call__(self, fun, *args, **kwargs):
+        f = ray.remote(fun, *args, **kwargs)
+
+        @wraps(fun)
+        def foo(*args, **kwargs):
+            return self.submit(f, *args, **kwargs)
+
+        return foo
+
+    def submit(self, fun, *args, **kwargs):
+        while len(self.running) >= self.n:
+            _, self.running = ray.wait(self.running, num_returns=1)
+        res = fun.remote(*args, **kwargs)
+        self.running.append(res)
+        return res
+
+    def reset(self):
+        self.running = []
