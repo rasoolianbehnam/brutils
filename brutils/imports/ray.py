@@ -1,7 +1,7 @@
 import ray
 from types import ModuleType
 import importlib
-from functools import wraps
+from functools import wraps, partial
 import os, subprocess
 
 
@@ -38,10 +38,16 @@ class Scheduler:
         self.running = []
 
     @wraps(ray.remote)
-    def __call__(self, fun, *args, **kwargs):
-        f = ray.remote(fun, *args, **kwargs)
+    def __call__(self, *args, **kwargs):
+        if len(args):
+            if len(kwargs):
+                f = ray.remote(**kwargs)(*args)
+            else:
+                f = ray.remote(*args)
+        else:
+            return partial(self, **kwargs)
 
-        @wraps(fun)
+        @wraps(f.remote)
         def foo(*args, **kwargs):
             return self.submit(f, *args, **kwargs)
 
