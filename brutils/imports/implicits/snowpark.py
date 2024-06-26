@@ -1,7 +1,9 @@
 from brutils.utility import RegisterWithClass
 from snowflake.snowpark.table import Table
 from snowflake.snowpark.dataframe import DataFrame
-from snowflake.snowpark.relational_grouped_dataframe import RelationalGroupedDataFrame as GroupedData
+from snowflake.snowpark.relational_grouped_dataframe import (
+    RelationalGroupedDataFrame as GroupedData,
+)
 from snowflake.snowpark.column import Column
 import snowflake.snowpark.functions as F
 import snowflake.snowpark.types as T
@@ -12,8 +14,6 @@ from functools import reduce
 import re
 
 
-
-
 @RegisterWithClass(Table, DataFrame)
 def __repr__(self):
     cols = str([f"{k}::{v}" for k, v in self.dtypes])
@@ -21,14 +21,11 @@ def __repr__(self):
     return f"{type_}{cols}".replace("'", "").replace("16777216", "")
 
 
-
 @RegisterWithClass(Table, DataFrame)
 def pandas(self, k=None):
     if k is not None:
         self = self.limit(k)
     return self.toPandas()
-
-
 
 
 @RegisterWithClass(Table, DataFrame)
@@ -65,7 +62,9 @@ def Agg(self, *cols):
 
 @RegisterWithClass(GroupedData)
 def probDist(self):
-    return self.count().assign(p=F.col("count") / F.sum("count").over(Window.partitionBy()))
+    return self.count().assign(
+        p=F.col("count") / F.sum("count").over(Window.partitionBy())
+    )
 
 
 @RegisterWithClass(Table, DataFrame)
@@ -94,7 +93,7 @@ def get_alias(k, v):
     if " as " in v:
         v, alias = v.split(" as ", 1)
     alias = alias.strip()
-    if alias == '':
+    if alias == "":
         alias = v
     return v, alias
 
@@ -128,8 +127,8 @@ def select3(self, *args, **kwargs):
 @RegisterWithClass(Table, DataFrame)
 def select_dtype(self, *dtypes):
     dtypes = set(dtypes)
-    if 'numeric' in dtypes:
-        dtypes = dtypes.union({'bigint', 'double', 'int', 'float'})
+    if "numeric" in dtypes:
+        dtypes = dtypes.union({"bigint", "double", "int", "float"})
     return self.select([x[0] for x in self.dtypes if x[1] in dtypes])
 
 
@@ -181,7 +180,7 @@ def colsRegex(self, patterns, strict):
         if strict:
             c = re.compile(pattern)
         else:
-            c = re.compile('(?i)^.*' + pattern + '.*$')
+            c = re.compile("(?i)^.*" + pattern + ".*$")
         cols.extend([x for x in self.columns if c.match(x)])
     return cols
 
@@ -193,7 +192,7 @@ def select_regex(self, *patterns, strict=False):
         if strict:
             c = re.compile(pattern)
         else:
-            c = re.compile('(?i)^.*' + pattern + '.*$')
+            c = re.compile("(?i)^.*" + pattern + ".*$")
         cols.extend([x for x in self.columns if c.match(x)])
     return self.select(cols)
 
@@ -210,12 +209,15 @@ def and_filters(self, *filters):
 
 def describe_(col, percentiles=None):
     if percentiles is None:
-        percentiles = [.25, .5, .75]
-    p = ','.join(["%.2f" % p for p in percentiles])
+        percentiles = [0.25, 0.5, 0.75]
+    p = ",".join(["%.2f" % p for p in percentiles])
     x = F.expr(f"percentile({col}, array({p}))").alias("percentiles")
     return (
-        F.count("*").alias("count"), F.avg(col).alias("mean"), F.stddev(col).alias("std"),
-        F.min(col).alias("min"), F.max(col).alias("max"),
+        F.count("*").alias("count"),
+        F.avg(col).alias("mean"),
+        F.stddev(col).alias("std"),
+        F.min(col).alias("min"),
+        F.max(col).alias("max"),
         *[x[i].alias(f"{int(p * 100)}%") for i, p in enumerate(percentiles)],
     )
 
@@ -223,9 +225,13 @@ def describe_(col, percentiles=None):
 @RegisterWithClass(Table, DataFrame)
 def describe2(self, subset=None, percentiles=None):
     from brutils.utility.spark_utils import union_by_col
+
     if subset is None:
         subset = self.columns
-    res = [self.select(F.lit(col).alias("col"), *describe_(col, percentiles)) for col in subset]
+    res = [
+        self.select(F.lit(col).alias("col"), *describe_(col, percentiles))
+        for col in subset
+    ]
     return union_by_col(res).select(res[0].columns)
 
 
@@ -242,16 +248,22 @@ def self_join_lambda(self: DataFrame, f, on=None, **kwargs):
 @RegisterWithClass(GroupedData)
 def describe(self, subset=None, percentiles=None):
     from brutils.utility.spark_utils import union_by_col
+
     if subset is None:
         subset = self.columns
-    res = [self.agg(F.lit(col).alias("col"), *describe_(col, percentiles)) for col in subset]
+    res = [
+        self.agg(F.lit(col).alias("col"), *describe_(col, percentiles))
+        for col in subset
+    ]
     return union_by_col(res).select(res[0].columns)
 
 
 @RegisterWithClass(GroupedData)
 def Collect(self, *cols, col_name="collected"):
-    return (
-        self.agg(F.array_distinct(F.arrays_zip(*[F.collect_set(col) for col in cols])).alias(col_name))
+    return self.agg(
+        F.array_distinct(F.arrays_zip(*[F.collect_set(col) for col in cols])).alias(
+            col_name
+        )
     )
 
 
@@ -275,17 +287,17 @@ def filter_by_group(df, group, agg, filt, how="left_semi", join=None):
     """
     if join is None:
         join = group
-    f = (
-        df.groupBy(group).agg(agg.alias('agg'))
-            .filter(filt)
-    )
+    f = df.groupBy(group).agg(agg.alias("agg")).filter(filt)
     return df.join(f, on=join, how=how)
 
 
 @RegisterWithClass(Table, DataFrame)
 def merge(self, df, on=None, **kwargs):
     if on is None:
-        on = list(set([x.lower() for x in self.columns]) & set([x.lower() for x in df.columns]))
+        on = list(
+            set([x.lower() for x in self.columns])
+            & set([x.lower() for x in df.columns])
+        )
     return self.join(df, on=on, **kwargs)
 
 
@@ -294,7 +306,7 @@ def filters(self, *args):
     str_filters = [f"({f})" for f in args if isinstance(f, str)]
     final_filters = [f for f in args if not isinstance(f, str)]
     if len(str_filters):
-        final_filters.append(' and '.join(str_filters))
+        final_filters.append(" and ".join(str_filters))
     out = self
     for f in final_filters:
         out = out.filter(f)
@@ -309,6 +321,7 @@ def set_columns(df, cols):
 @RegisterWithClass(Table, DataFrame)
 def filtex(self, pattern):
     import pandas as pd
+
     cols = pd.Series(self.columns)[lambda s: s.str.match(pattern)].tolist()
     return self[cols]
 
@@ -317,8 +330,15 @@ def filtex(self, pattern):
 def first_k(self, k, *cols, partitionBy=None):
     if partitionBy is None:
         partitionBy = []
-    return self.assign(raghas123=F.dense_rank().over(Window.partitionBy(partitionBy).orderBy(*cols))) \
-        .filter(F.col("raghas123") <= k).drop("raghas123")
+    return (
+        self.assign(
+            raghas123=F.dense_rank().over(
+                Window.partitionBy(partitionBy).orderBy(*cols)
+            )
+        )
+        .filter(F.col("raghas123") <= k)
+        .drop("raghas123")
+    )
 
 
 @RegisterWithClass(Table, DataFrame)
@@ -332,8 +352,17 @@ def prefix(self, prefix, *exceptions):
 
 @RegisterWithClass(Table, DataFrame)
 def countDistribution(self, col):
-    return self.groupBy(col).agg2(count='* as n').groupBy("n").count() \
-        .assign(t=F.sum("count").over(Window.partitionBy()), p=F.col("count") / F.col("t")).drop("t").sort("n")
+    return (
+        self.groupBy(col)
+        .agg2(count="* as n")
+        .groupBy("n")
+        .count()
+        .assign(
+            t=F.sum("count").over(Window.partitionBy()), p=F.col("count") / F.col("t")
+        )
+        .drop("t")
+        .sort("n")
+    )
 
 
 @RegisterWithClass(Table, DataFrame)
@@ -345,15 +374,25 @@ def CheckManyToMany(df, col1=None, col2=None, extra_cols=None, aggs=None):
     if aggs is None:
         aggs = []
     aggs = [F.count] + aggs
-    aggs_ = [f('a') for f in aggs]
+    aggs_ = [f("a") for f in aggs]
     if extra_cols is None:
         extra_cols = []
-    a = df.groupBy([*extra_cols, col1]).agg(F.countDistinct(col2).alias("a")).filter("a>1").groupBy(*extra_cols) \
-        .agg(*aggs_) \
+    a = (
+        df.groupBy([*extra_cols, col1])
+        .agg(F.countDistinct(col2).alias("a"))
+        .filter("a>1")
+        .groupBy(*extra_cols)
+        .agg(*aggs_)
         .assign(name=f"one {col1} to many {col2}")
-    b = df.groupBy([*extra_cols, col2]).agg(F.countDistinct(col1).alias("a")).filter("a>1").groupBy(*extra_cols) \
-        .agg(*aggs_) \
+    )
+    b = (
+        df.groupBy([*extra_cols, col2])
+        .agg(F.countDistinct(col1).alias("a"))
+        .filter("a>1")
+        .groupBy(*extra_cols)
+        .agg(*aggs_)
         .assign(name=f"one {col2} to many {col1}")
+    )
     return a.union(b)
 
 
@@ -361,7 +400,7 @@ def CheckManyToMany(df, col1=None, col2=None, extra_cols=None, aggs=None):
 def RemoveOneToMany(df, col1, col2=None):
     f = df.groupBy(col1)
     if col2 is None:
-        f = f.agg(F.count('*').alias("n"))
+        f = f.agg(F.count("*").alias("n"))
     else:
         f = f.agg(F.nunique(col2).alias("n"))
     f = f.filter("n==1")
@@ -373,14 +412,17 @@ def GetVenn(df1, df2, on, name1="a", name2="b", fancy=False):
     union = f"{name1} $\cup$ {name2}" if fancy else "union"
     intersection = f"{name1} $\cap$ {name2}" if fancy else "intersection"
     return (
-        df1.select(on).distinct().withColumn("a", F.lit(1))
-            .join(df2.select(on).distinct().withColumn("b", F.lit(1)), on=on, how="outer")
-            .select(
+        df1.select(on)
+        .distinct()
+        .withColumn("a", F.lit(1))
+        .join(df2.select(on).distinct().withColumn("b", F.lit(1)), on=on, how="outer")
+        .select(
             F.sum("a").alias(name1),
             F.sum("b").alias(name2),
-            F.count('*').alias(union),
-            F.sum(F.expr("cast(a*b as int)")).alias(intersection), )
-            .assign(
+            F.count("*").alias(union),
+            F.sum(F.expr("cast(a*b as int)")).alias(intersection),
+        )
+        .assign(
             jaccard=F.col("intersection") / F.col("union"),
             p_intersect_a=F.col("intersection") / F.col(name1),
             p_intersect_b=F.col("intersection") / F.col(name2),
@@ -389,7 +431,9 @@ def GetVenn(df1, df2, on, name1="a", name2="b", fancy=False):
 
 
 @RegisterWithClass(Table, DataFrame)
-def GetVennGrouped(df1, df2, on, groupBy: list = None, name1="a", name2="b", fancy=False):
+def GetVennGrouped(
+    df1, df2, on, groupBy: list = None, name1="a", name2="b", fancy=False
+):
     if isinstance(on, str):
         on = [on]
     if groupBy is None:
@@ -399,18 +443,26 @@ def GetVennGrouped(df1, df2, on, groupBy: list = None, name1="a", name2="b", fan
     union = f"|{name1} $\cup$ {name2}|" if fancy else "union"
     intersection = f"|{name1} $\cap$ {name2}|" if fancy else "intersection"
     return (
-        df1.select(on + groupBy).distinct().withColumn("a", F.lit(1))
-            .join(df2.select(on + groupBy).distinct().withColumn("b", F.lit(1)), on=groupBy+on, how="outer")
-            .groupBy(groupBy)
-            .agg(
-            F.sum("a").cast('int').alias(name1),
-            F.sum("b").cast('int').alias(name2),
-            F.count('*').cast('int').alias(union),
-            F.sum(F.expr(f"a*b")).cast('int').alias(intersection), )
-            .assign(**{
-                'jaccard':F.col(intersection) / F.col(union),
-                f'p_intersect_{name1}':F.col(intersection) / F.col(name1),
-                f'p_intersect_{name2}':F.col(intersection) / F.col(name2),
+        df1.select(on + groupBy)
+        .distinct()
+        .withColumn("a", F.lit(1))
+        .join(
+            df2.select(on + groupBy).distinct().withColumn("b", F.lit(1)),
+            on=groupBy + on,
+            how="outer",
+        )
+        .groupBy(groupBy)
+        .agg(
+            F.sum("a").cast("int").alias(name1),
+            F.sum("b").cast("int").alias(name2),
+            F.count("*").cast("int").alias(union),
+            F.sum(F.expr(f"a*b")).cast("int").alias(intersection),
+        )
+        .assign(
+            **{
+                "jaccard": F.col(intersection) / F.col(union),
+                f"p_intersect_{name1}": F.col(intersection) / F.col(name1),
+                f"p_intersect_{name2}": F.col(intersection) / F.col(name2),
             }
         )
         .sort(groupBy)
@@ -429,7 +481,9 @@ def MakeOneToOne(df, col1=None, col2=None, extra_cols=None, dropna=False):
         df = df.dropna(subset=[col1, col2])
     a = df.groupBy(*extra_cols, col1).agg(F.nunique(col2).alias("a")).filter("a>1")
     b = df.groupBy(*extra_cols, col2).agg(F.nunique(col1).alias("a")).filter("a>1")
-    return df.join(a, on=[*extra_cols, col1], how="left_anti").join(b, on=[*extra_cols, col2], how="left_anti")
+    return df.join(a, on=[*extra_cols, col1], how="left_anti").join(
+        b, on=[*extra_cols, col2], how="left_anti"
+    )
 
 
 @RegisterWithClass(Table, DataFrame)
@@ -469,6 +523,15 @@ def explode(self, col, name=None):
     return self.select(*cols, F.explode(col).alias(name))
 
 
+@RegisterWithClass(Table, DataFrame)
+def join2(self, other, left_on, right_on, *args, **kwargs):
+    assert len(left_on) == len(right_on)
+    left_on = [F.col(l) if isinstance(l, str) else l for l in left_on]
+    right_on = [F.col(r) if isinstance(r, str) else r for r in right_on]
+    on = reduce(lambda a, b: a | b, [l == r for l, r in zip(left_on, right_on)])
+    return self.join(other, *args, on=on, **kwargs)
+
+
 @RegisterWithClass(F.Column)
 def rlike_isin(self, l, compare_fun=F.Column.rlike):
     return reduce(operator.or_, [compare_fun(self, x) for x in l])
@@ -484,7 +547,7 @@ def map_from_dict(self, d, compare_fun=F.Column.__eq__, otherwise=None):
         out = out.when(compare_fun(self, items[i][0]), F.lit(items[i][1]))
     if otherwise is None:
         return out
-    elif otherwise == 'self':
+    elif otherwise == "self":
         return out.otherwise(self)
     else:
         return out.otherwise(otherwise)
@@ -495,7 +558,7 @@ def array_is_subset(a, b):
 
 
 def percentile(col, percentiles):
-    array = ', '.join([str(x) for x in percentiles])
+    array = ", ".join([str(x) for x in percentiles])
     expr = f"percentile({col}, array({array}))"
     return F.expr(expr)
 
@@ -553,4 +616,3 @@ Table.groupBy2 = Table.groupBy2
 Table.mutate = Table.assign
 Table.group_by = Table.groupBy
 Table.groupby = Table.groupBy
-
