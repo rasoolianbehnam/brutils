@@ -2,6 +2,7 @@ import ray
 from types import ModuleType
 import importlib
 from functools import wraps, partial
+
 import os, subprocess
 
 
@@ -54,11 +55,21 @@ class Scheduler:
         return foo
 
     def submit(self, fun, *args, **kwargs):
-        while len(self.running) >= self.n:
-            _, self.running = ray.wait(self.running, num_returns=1)
-        res = fun.remote(*args, **kwargs)
+        k = len(self.running) - self.n + 1
+        self.wait(k)
+        res = out = fun.remote(*args, **kwargs)
+        if isinstance(res, list):
+            res = out[0]
         self.running.append(res)
-        return res
+        return out
 
-    def reset(self):
-        self.running = []
+    def wait(self, k=None):
+        if k is None:
+            _, self.running = ray.wait(self.running, num_returns=len(self.running))
+        elif k >= 1:
+            _, self.running = ray.wait(self.running, num_returns=k)
+
+    def reset(self, n):
+        self.n = n
+        k = len(self.running) - self.n + 1
+        self.wait(k)
