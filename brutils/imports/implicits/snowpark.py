@@ -13,6 +13,14 @@ import operator
 from functools import reduce
 import re
 
+import snowflake
+import pandas as pd
+
+
+@RegisterWithClass(snowflake.snowpark.session.Session)
+def list_tables(self):
+    return pd.DataFrame(self.sql("show tables").collect())
+
 
 @RegisterWithClass(Table, DataFrame)
 def __repr__(self):
@@ -25,7 +33,7 @@ def __repr__(self):
 def pandas(self, k=None):
     if k is not None:
         self = self.limit(k)
-    return self.toPandas()
+    return self.toPandas().lower()
 
 
 @RegisterWithClass(Table, DataFrame)
