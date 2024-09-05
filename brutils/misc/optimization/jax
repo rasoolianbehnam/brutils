@@ -1,0 +1,26 @@
+import jax
+import cvxpy as cx
+
+
+def solve_trust_region_subproblem(Δf, H, x0, δ):
+    v = cx.Variable(len(x0))
+    objective = (v - x0) @ Δf(x0) + cx.quad_form(v - x0, H(x0) / 2)
+    p = cx.Problem(cx.Minimize(objective), constraints=[cx.norm2(v) <= δ])
+    out = p.solve(solver="SCS")
+    return v.value, out
+
+
+def trust_region_descent(f, x, k_max, η1=0.25, η2=0.5, γ1=0.5, γ2=2, δ=1):
+    Δf = jax.jacobian(f)
+    H = jax.hessian(f)
+    y = f(x)
+    for k in range(k_max):
+        x_, y_ = solve_trust_region_subproblem(Δf, H, x, δ)
+        r = (y - f(x_)) / (y - y_)
+        if r < η1:
+            δ *= η1
+        else:
+            x, y = x_, y_
+            if r > η2:
+                δ *= γ2
+    return x
