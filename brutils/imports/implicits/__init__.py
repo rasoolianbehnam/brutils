@@ -1,3 +1,4 @@
+import re
 import atexit
 import itertools
 import operator
@@ -62,17 +63,20 @@ def left_anti_join(self, b, **kwargs):
         left_on, right_on = on, on
     kwargs["how"] = "outer"
     kwargs["indicator"] = True
-    return (self.merge(b[right_on].drop_duplicates(),
-                       left_on=left_on,
-                       right_on=right_on,
-                       **kwargs)
-            .query('_merge == "left_only"').drop("_merge", axis=1)
-            )
+    return (
+        self.merge(
+            b[right_on].drop_duplicates(), left_on=left_on, right_on=right_on, **kwargs
+        )
+        .query('_merge == "left_only"')
+        .drop("_merge", axis=1)
+    )
 
 
 @RegisterWithClass(pd.DataFrame)
 def cartesian_join(self, b):
-    return self.assign(ababab=1).merge(b.assign(ababab=1), on="ababab").drop("ababab", 1)
+    return (
+        self.assign(ababab=1).merge(b.assign(ababab=1), on="ababab").drop("ababab", 1)
+    )
 
 
 @RegisterWithClass(pd.DataFrame)
@@ -103,9 +107,11 @@ def Rename2(self, *args, **kwargs):
 
 
 @RegisterWithClass(pd.DataFrame)
-def dropcol(self, *args, **kwargs):
+def dropcol(self, *args, ignore_nonexisting=True, **kwargs):
     if isinstance(args[0], list):
         args = args[0]
+    if ignore_nonexisting:
+        args = [x for x in args if x in self.columns]
     return self.drop(list(args), axis=1, **kwargs)
 
 
@@ -134,19 +140,19 @@ def set_value(self, values, set_index=True):
 
 
 @RegisterWithClass(pd.DataFrame)
-def obj_to_cat(self, suffix='', cols=None):
+def obj_to_cat(self, suffix="", cols=None):
     if cols is None:
         cols = list(self)
     out = self[cols].copy()
     for c in cols:
         s = out[c]
-        if s.dtype == 'object':
+        if s.dtype == "object":
             out[c + suffix] = pd.Categorical(s)
     return out
 
 
 @RegisterWithClass(pd.DataFrame)
-def cat_to_code(self, suffix='', cols=None):
+def cat_to_code(self, suffix="", cols=None):
     if cols is None:
         cols = list(self)
     out = self[cols].copy()
@@ -158,7 +164,7 @@ def cat_to_code(self, suffix='', cols=None):
 
 
 @RegisterWithClass(pd.DataFrame)
-def obj_to_code(self, suf1='', suf2='', cols=None):
+def obj_to_code(self, suf1="", suf2="", cols=None):
     if cols is None:
         cols = list(self)
     return self.obj_to_cat(suf1, cols=cols).cat_to_code(suf2, cols=cols)
@@ -172,12 +178,12 @@ def coords(self, cols=None, drop_cols=None):
         cols = list(self)
     cols = list(set(cols) - set(drop_cols))
     d = self.obj_to_cat(cols=cols)
-    coords = {'index': d.index.values}
+    coords = {"index": d.index.values}
     for c in cols:
         s = d[c]
         if isinstance(s.dtype, pd.CategoricalDtype):
             coords[c] = s.cat.categories.tolist()
-        elif s.dtype != 'float':
+        elif s.dtype != "float":
             coords[c] = sorted(s.unique())
     return coords
 
@@ -185,10 +191,11 @@ def coords(self, cols=None, drop_cols=None):
 @RegisterWithClass(pd.DataFrame)
 def Data(self, cols=None, dims="index"):
     import pymc3 as pm
+
     self = self.obj_to_code(cols=cols).reset_index()
     if cols is None:
         cols = list(self)
-    Data = namedtuple('Data', cols)
+    Data = namedtuple("Data", cols)
     return Data(*[pm.Data(c, self[c].values, dims=dims) for c in cols])
 
 
@@ -204,22 +211,24 @@ def truncated(tmp, beg=4, end=3):
     end = list(reversed([-x - 1 for x in range(end + 1)]))
     tmp = tmp.iloc[:, beg + end]
     tmp = tmp.Rename2(**{"...": tmp.columns[-len(end)]})
-    tmp.iloc[:, -4] = '...'
+    tmp.iloc[:, -4] = "..."
     return tmp
 
 
 @RegisterWithClass(pd.DataFrame)
 def show_all_rows(self):
     from IPython.core.display import display
-    n = pd.get_option('display.max_rows')
-    pd.set_option('display.max_rows', None)
+
+    n = pd.get_option("display.max_rows")
+    pd.set_option("display.max_rows", None)
     display(self)
-    pd.set_option('display.max_rows', n)
+    pd.set_option("display.max_rows", n)
 
 
 @RegisterWithClass(pd.DataFrame)
 def sns(self, plot_name, **kwargs):
     import seaborn as sns
+
     getattr(sns, plot_name)(data=self, **kwargs)
 
 
@@ -253,8 +262,13 @@ def apply3(self, s, inplace=False, **kwargs):
 
 
 @RegisterWithClass(pd.DataFrame)
-def stack2(self, index, level_1, value='value'):
-    return self.set_index(index).stack().reset_index().Rename2(**{level_1: 'level_1', value: 0})
+def stack2(self, index, level_1, value="value"):
+    return (
+        self.set_index(index)
+        .stack()
+        .reset_index()
+        .Rename2(**{level_1: "level_1", value: 0})
+    )
 
 
 @RegisterWithClass(pd.DataFrame)
@@ -278,9 +292,7 @@ def selectExpression(self, *cols):
 
 @RegisterWithClass(pd.DataFrame)
 def rselect(self, *cols):
-    return pd.concat([
-        self.filter(regex=col) for col in cols
-    ], axis=1)
+    return pd.concat([self.filter(regex=col) for col in cols], axis=1)
 
 
 @RegisterWithClass(pd.DataFrame)
@@ -292,7 +304,9 @@ def rdrop(self, *cols):
 @RegisterWithClass(pd.DataFrame)
 def filtex(self, *regex, **kwargs):
     tmp = self.iloc[:1]
-    cols = reduce(operator.add, [list(tmp.filter(regex=r, **kwargs).columns) for r in regex])
+    cols = reduce(
+        operator.add, [list(tmp.filter(regex=r, **kwargs).columns) for r in regex]
+    )
     return self[cols]
 
 
@@ -303,9 +317,18 @@ def filt(self, f):
     return self.query(f)
 
 
+@ut.RegisterWithClass(pd.DataFrame)
+def dropcolregex(self, *patterns):
+    def match(x):
+        return any(re.match(pattern, x) for pattern in patterns)
+
+    cols = [x for x in self.columns if not match(x)]
+    return self[cols]
+
+
 @RegisterWithClass(pd.Series)
 def quantile_rank(self, k):
-    return ((self.rank() / len(self)) * k).astype('int')
+    return ((self.rank() / len(self)) * k).astype("int")
 
 
 @RegisterWithClass(pd.Series)
