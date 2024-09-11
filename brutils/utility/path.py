@@ -23,4 +23,4 @@ class PathManager(PosixPath):
         return self.__class__(".".join(out))
 
     def change_dir(self, new_dir):
-        return Path(new_dir) / Path(self.basename)
+        return self.__class__(Path(new_dir) / Path(self.basename))
