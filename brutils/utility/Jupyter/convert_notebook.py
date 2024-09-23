@@ -6,6 +6,7 @@ import os
 import argparse
 import json
 import copy
+import re
 
 
 def convert(args=None):
@@ -103,10 +104,11 @@ def convert(args=None):
     body = [join_cells(new_cells[: functions[0][1]])]
     for name, s, f in functions:
         out = join_cells([new_cells[i] for i in range(s, f)], indent="\t")
-        out = f"def {name}():\n{out}"
+        name = get_function_signature(name)
+        out = f"def {name}:\n{out}"
         body.append(out)
 
-    in_main = "\n\t".join([f"{f[0]}()" for f in functions])
+    in_main = "\n\t".join([f"{get_function_signature(f[0])}" for f in functions])
 
     final_body = "\n\n".join(body)
     final_body = f"""#!/usr/bin/env python
@@ -124,3 +126,13 @@ if __name__=='__main__':
         f.write(final_body)
 
     os.system(f"black {args.output_file}")
+
+
+def get_function_signature(name):
+    match = re.search("(.*)\((.*)\)", name)
+    if match:
+        params_str = f"({match.group(2)})"
+        name = match.group(1)
+    else:
+        params_str = "()"
+    return f"{name}{params_str}"
