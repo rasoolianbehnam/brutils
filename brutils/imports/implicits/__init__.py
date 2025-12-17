@@ -347,6 +347,11 @@ def toProb(self):
     return self / self.sum()
 
 
+@RegisterWithClass(pd.Series)
+def assign(self, *args, **kwargs):
+    return self.to_frame().assign(*args, **kwargs)
+
+
 pd.DataFrame.dropcols = pd.DataFrame.dropcol
 pd.DataFrame.rename2 = pd.DataFrame.Rename2
 pd.DataFrame.Rename = pd.DataFrame.Rename2

@@ -561,6 +561,100 @@ def map_from_dict(self, d, compare_fun=F.Column.__eq__, otherwise=None):
         return out.otherwise(otherwise)
 
 
+@RegisterWithClass(Table, DataFrame)
+def audit(self):
+    r01 = (
+        self[[F.nunique(col).alias(col) for col in self.columns]]
+        .pandas()
+        .iloc[0]
+        .rename("cardinality")
+    )
+    r02 = (
+        self[[F.sum(F.is_null(col).cast("int")).alias(col) for col in self.columns]]
+        .pandas()
+        .iloc[0]
+        .rename("n_missing")
+    )
+    r03 = (
+        self[
+            [
+                F.array_slice(F.collect_set(col), F.lit(0), F.lit(2)).alias(col)
+                for col in self.columns
+            ]
+        ]
+        .pandas()
+        .iloc[0]
+        .rename("sample_values")
+    )
+    return pd.concat(
+        [
+            pd.Series([x[1] for x in self.dtypes], name="data_types", index=r01.index),
+            r01,
+            r02,
+            r03.map(eval),
+        ],
+        axis=1,
+    )
+
+
+@RegisterWithClass(Table, DataFrame)
+def separate_columns_by_type(df):
+    """
+    Separate Snowpark DataFrame columns by type: numeric, categorical, and timestamp.
+
+    Parameters:
+    -----------
+    df : snowflake.snowpark.dataframe.DataFrame
+        Input Snowpark DataFrame
+
+    Returns:
+    --------
+    dict : Dictionary with keys 'numeric', 'categorical', and 'timestamp'
+           containing lists of column names for each type
+    """
+    from snowflake.snowpark.types import (
+        IntegerType,
+        LongType,
+        ShortType,
+        ByteType,
+        FloatType,
+        DoubleType,
+        DecimalType,
+        DateType,
+        TimestampType,
+        TimeType,
+    )
+
+    numeric_cols = []
+    categorical_cols = []
+    timestamp_cols = []
+
+    for field in df.schema.fields:
+        col_name = field.name
+        col_type = type(field.datatype)
+
+        if col_type in [
+            IntegerType,
+            LongType,
+            ShortType,
+            ByteType,
+            FloatType,
+            DoubleType,
+            DecimalType,
+        ]:
+            numeric_cols.append(col_name)
+        elif col_type in [DateType, TimestampType, TimeType]:
+            timestamp_cols.append(col_name)
+        else:
+            categorical_cols.append(col_name)
+
+    return {
+        "numeric": numeric_cols,
+        "categorical": categorical_cols,
+        "timestamp": timestamp_cols,
+    }
+
+
 def array_is_subset(a, b):
     return F.size(a) == F.size(F.array_intersect(a, b))
 
