@@ -80,7 +80,7 @@ def convert(args=None):
     cells[0]
 
     functions = [
-        [cell["source"][0][2:].strip().lower().replace(" ", "_"), i + 1, 0]
+        [cell["source"][0][2:].strip().replace(" ", "_"), i + 1, 0]
         for i, cell in enumerate(new_cells)
         if isMarkdown(cell) and startswith(cell, "# ")
     ]
