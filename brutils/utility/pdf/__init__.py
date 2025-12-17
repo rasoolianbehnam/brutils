@@ -35,8 +35,25 @@ def get_bookmark_pages(reader: PdfReader):
                 current_parent = l[i][1]
                 yield (*l[i], p)
 
-    a = [process(x) for x in reader.outline]
-    return pd.DataFrame(find_parents(a), columns=["title", "page", "parent"])
+    bookmarks = [process(x) for x in reader.outline]
+    a = []
+    i = 0
+    for x in bookmarks:
+        if isinstance(x, list):
+            a.append(i - 1)
+            i += len(x)
+        else:
+            a.append(None)
+            i += 1
+    b = (
+        pd.Series(bookmarks, index=a)
+        .map(lambda x: [x] if isinstance(x, tuple) else x)
+        .explode()
+    )
+    c = b.reset_index().rename(columns={"index": "parent"})
+    c[["title", "page"]] = c[0].to_list()
+    c = c[["title", "page", "parent"]]
+    return c
 
 
 def copy_pdf(input_file, output_file, blank_page=None):
