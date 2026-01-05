@@ -562,36 +562,70 @@ def map_from_dict(self, d, compare_fun=F.Column.__eq__, otherwise=None):
 
 
 @RegisterWithClass(Table, DataFrame)
-def audit(self):
-    r01 = (
+def audit(self, min_cardinality=10):
+    n = self.count()
+    print(f"Number of rows: {n}")
+    cardinality = (
         self[[F.nunique(col).alias(col) for col in self.columns]]
         .pandas()
         .iloc[0]
         .rename("cardinality")
     )
-    r02 = (
+    p_missing = (
         self[[F.sum(F.is_null(col).cast("int")).alias(col) for col in self.columns]]
         .pandas()
         .iloc[0]
-        .rename("n_missing")
-    )
-    r03 = (
+        .rename("p_missing")
+    ) / n
+    sample_values = (
         self[
             [
-                F.array_slice(F.collect_set(col), F.lit(0), F.lit(2)).alias(col)
-                for col in self.columns
+                F.array_slice(
+                    F.collect_set(col),
+                    F.lit(0),
+                    F.lit(2 if card > min_cardinality else int(card)),
+                ).alias(col)
+                for card, col in zip(cardinality, self.columns)
             ]
         ]
         .pandas()
         .iloc[0]
         .rename("sample_values")
     )
+    mins = (
+        self[[F.min(col).alias(col) for col in self.columns]]
+        .pandas()
+        .T[0]
+        .rename("min")
+    )
+    maxs = (
+        self[[F.max(col).alias(col) for col in self.columns]]
+        .pandas()
+        .T[0]
+        .rename("max")
+    )
+    skewness = (
+        self[
+            [
+                F.skew(col).alias(col)
+                for col in self.separate_columns_by_type()["numeric"]
+            ]
+        ]
+        .pandas()
+        .T[0]
+        .rename("skewness")
+    )
     return pd.concat(
         [
-            pd.Series([x[1] for x in self.dtypes], name="data_types", index=r01.index),
-            r01,
-            r02,
-            r03.map(eval),
+            pd.Series(
+                [x[1] for x in self.dtypes], name="data_types", index=cardinality.index
+            ),
+            cardinality,
+            p_missing,
+            sample_values.map(eval).map(sorted),
+            mins,
+            maxs,
+            skewness,
         ],
         axis=1,
     )
