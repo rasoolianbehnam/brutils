@@ -604,17 +604,20 @@ def audit(self, min_cardinality=10):
         .T[0]
         .rename("max")
     )
-    skewness = (
-        self[
-            [
-                F.skew(col).alias(col)
-                for col in self.separate_columns_by_type()["numeric"]
+    try:
+        skewness = (
+            self[
+                [
+                    F.skew(col).alias(col)
+                    for col in self.separate_columns_by_type()["numeric"]
+                ]
             ]
-        ]
-        .pandas()
-        .T[0]
-        .rename("skewness")
-    )
+            .pandas()
+            .T[0]
+            .rename("skewness")
+        )
+    except:
+        skewness = pd.Series(name="skewness", index=[x.lower() for x in self.columns])
     return pd.concat(
         [
             pd.Series(

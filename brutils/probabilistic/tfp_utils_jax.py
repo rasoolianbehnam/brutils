@@ -39,6 +39,21 @@ TARGET_VERSION = Version("2.5")
 PARAMETERS = {}
 
 
+class JointDistributionCoroutine:
+    def __init__(self, fun):
+        self.fun = fun
+
+    def __call__(self, *args, **kwargs):
+        @tfd.JointDistributionCoroutine
+        @functools.wraps(self.fun)
+        def model():
+            yield from self.fun(*args)
+
+        if len(kwargs):
+            return model.experimental_pin(**kwargs)
+        return model
+
+
 def add_loglikelihood_to_inference_data(pinnedModel, posteriorSamples):
     dists = pinnedModel.distribution.sample_distributions(**posteriorSamples.dict)[0]
 
